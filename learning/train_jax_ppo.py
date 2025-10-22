@@ -41,6 +41,8 @@ from mujoco_playground.config import locomotion_params
 from mujoco_playground.config import manipulation_params
 import tensorboardX
 import wandb
+from orbax import checkpoint as ocp
+from flax.training import orbax_utils
 
 
 xla_flags = os.environ.get("XLA_FLAGS", "")
@@ -433,6 +435,11 @@ def main(argv):
     def policy_params_fn(current_step, make_policy, params):  # pylint: disable=unused-argument
       rscope_handle.set_make_policy(make_policy)
       rscope_handle.dump_rollout(params)
+
+      # orbax_checkpointer = ocp.PyTreeCheckpointer()
+      # save_args = orbax_utils.save_args_from_target(params)
+      # path = ckpt_path / f"{current_step}"
+      # orbax_checkpointer.save(path, params, force=True, save_args=save_args)
 
   # Train or load the model
   make_inference_fn, params, _ = train_fn(  # pylint: disable=no-value-for-parameter
