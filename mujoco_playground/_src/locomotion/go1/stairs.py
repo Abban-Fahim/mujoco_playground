@@ -104,8 +104,8 @@ def default_config() -> config_dict.ConfigDict:
       lin_vel_y=[0.0, 0.0],
       ang_vel_yaw=[0.0, 0.0],
       impl="jax",
-      nconmax=4 * 8192,
-      njmax=40,
+      nconmax=100 * 8192,
+      njmax=12 + 100 * 4,
   )
 
 

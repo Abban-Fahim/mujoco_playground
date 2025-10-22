@@ -406,6 +406,13 @@ def main(argv):
   if _VISION.value:
     num_envs = env_cfg.vision_config.render_batch_size
 
+  # This handler will manage saving PyTrees.
+  # We set max_to_keep=None to fix the bug you found in the GitHub issue.
+  handler = ocp.PyTreeCheckpointHandler()
+  
+  # This checkpointer saves in the background (asynchronously)
+  orbax_checkpointer = ocp.AsyncCheckpointer(handler)
+
   policy_params_fn = lambda *args: None
   if _RSCOPE_ENVS.value:
     # Interactive visualisation of policy checkpoints
@@ -436,10 +443,13 @@ def main(argv):
       rscope_handle.set_make_policy(make_policy)
       rscope_handle.dump_rollout(params)
 
-      # orbax_checkpointer = ocp.PyTreeCheckpointer()
-      # save_args = orbax_utils.save_args_from_target(params)
-      # path = ckpt_path / f"{current_step}"
-      # orbax_checkpointer.save(path, params, force=True, save_args=save_args)
+      # Use the ASYNC checkpointer we defined outside the loop
+      save_args = orbax_utils.save_args_from_target(params)
+      path = ckpt_path / f"{current_step}"
+      
+      # This save is NOT blocking. It runs in the background.
+      # The `force=True` argument is removed.
+      orbax_checkpointer.save(path, params, save_args=save_args)
 
   # Train or load the model
   make_inference_fn, params, _ = train_fn(  # pylint: disable=no-value-for-parameter
@@ -449,6 +459,8 @@ def main(argv):
       eval_env=eval_env,
   )
 
+  orbax_checkpointer.wait_until_finished()
+  orbax_checkpointer.close()
   print("Done training.")
   if len(times) > 1:
     print(f"Time to JIT compile: {times[1] - times[0]}")
