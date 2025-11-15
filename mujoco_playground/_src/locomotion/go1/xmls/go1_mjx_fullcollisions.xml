@@ -1,5 +1,5 @@
 <mujoco model="go1">
-  <compiler angle="radian" meshdir="../../../../../mujoco_menagerie/unitree_go1/assets" autolimits="true"/>
+  <compiler angle="radian" meshdir="../../../../../../mujoco_menagerie/unitree_go1/assets" autolimits="true"/>
 
   <option iterations="1" ls_iterations="5" timestep="0.004" integrator="Euler">
     <flag eulerdamp="disable"/>
@@ -216,7 +216,7 @@
     <position class="knee" name="RL_calf" joint="RL_calf_joint"/>
   </actuator>
 
-  <sensor>
+  <!-- <sensor>
     <gyro site="imu" name="gyro"/>
     <velocimeter site="imu" name="local_linvel"/>
     <accelerometer site="imu" name="accelerometer"/>
@@ -235,5 +235,5 @@
     <framepos objtype="site" objname="RR" name="RR_pos" reftype="site" refname="imu"/>
     <framepos objtype="site" objname="RL" name="RL_pos" reftype="site" refname="imu"/>
     <framepos objtype="site" objname="head" name="head_pos"/>
-  </sensor>
+  </sensor> -->
 </mujoco>

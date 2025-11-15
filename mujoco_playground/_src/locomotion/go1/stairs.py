@@ -103,7 +103,7 @@ def default_config() -> config_dict.ConfigDict:
       lin_vel_x=[0.7, 0.7],  # Fixed target velocity
       lin_vel_y=[0.0, 0.0],
       ang_vel_yaw=[0.0, 0.0],
-      impl="jax",
+      impl="warp",
       nconmax=100 * 8192,
       njmax=12 + 100 * 4,
   )
@@ -230,10 +230,14 @@ class Stairs(go1_base.Go1Env):
     metrics["swing_peak"] = jp.zeros(())
 
     # Use the inherited _feet_floor_found_sensor
-    contact = jp.array([
-        data.sensordata[self._mj_model.sensor_adr[sensorid]] > 0
-        for sensorid in self._feet_floor_found_sensor
-    ])
+    # contact = jp.array([
+    #     data.sensordata[self._mj_model.sensor_adr[sensorid]] > 0
+    #     for sensorid in self._feet_floor_found_sensor
+    # ])
+
+    # [DEBUG] Create a dummy contact array
+    contact = jp.zeros(4, dtype=bool) 
+    
     obs = self._get_obs(data, info, contact)
     reward, done = jp.zeros(2)
     return mjx_env.State(data, obs, reward, done, metrics, info)
@@ -251,10 +255,11 @@ class Stairs(go1_base.Go1Env):
     state.info["motor_targets"] = motor_targets
 
     # Get contact state (using inherited _feet_floor_found_sensor)
-    contact = jp.array([
-        data.sensordata[self._mj_model.sensor_adr[sensorid]] > 0
-        for sensorid in self._feet_floor_found_sensor
-    ])
+    # contact = jp.array([
+    #     data.sensordata[self._mj_model.sensor_adr[sensorid]] > 0
+    #     for sensorid in self._feet_floor_found_sensor
+    # ])
+    contact = jp.zeros(4, dtype=bool)
     contact_filt = contact | state.info["last_contact"]
     first_contact = (state.info["feet_air_time"] > 0.0) * contact_filt
     state.info["feet_air_time"] += self.dt
@@ -312,95 +317,109 @@ class Stairs(go1_base.Go1Env):
 
     return fall_termination | nan_termination
 
+  # def _get_obs(
+  #     self, data: mjx.Data, info: dict[str, Any], contact: jax.Array
+  # ) -> mjx_env.Observation:
+  #   """Returns the observation vector."""
+  #   # Use Go1 base functions (no "torso"/"pelvis" arg)
+  #   gyro = self.get_gyro(data)
+  #   info["rng"], noise_rng = jax.random.split(info["rng"])
+  #   noisy_gyro = (
+  #       gyro
+  #       + (2 * jax.random.uniform(noise_rng, shape=gyro.shape) - 1)
+  #       * self._config.noise_config.level
+  #       * self._config.noise_config.scales.gyro
+  #   )
+
+  #   # Use get_gravity from Go1 base
+  #   gravity = self.get_gravity(data)
+  #   info["rng"], noise_rng = jax.random.split(info["rng"])
+  #   noisy_gravity = (
+  #       gravity
+  #       + (2 * jax.random.uniform(noise_rng, shape=gravity.shape) - 1)
+  #       * self._config.noise_config.level
+  #       * self._config.noise_config.scales.gravity
+  #   )
+
+  #   joint_angles = data.qpos[7:]
+  #   info["rng"], noise_rng = jax.random.split(info["rng"])
+  #   noisy_joint_angles = (
+  #       joint_angles
+  #       + (2 * jax.random.uniform(noise_rng, shape=joint_angles.shape) - 1)
+  #       * self._config.noise_config.level
+  #       * self._config.noise_config.scales.joint_pos
+  #   )
+
+  #   joint_vel = data.qvel[6:]
+  #   info["rng"], noise_rng = jax.random.split(info["rng"])
+  #   noisy_joint_vel = (
+  #       joint_vel
+  #       + (2 * jax.random.uniform(noise_rng, shape=joint_vel.shape) - 1)
+  #       * self._config.noise_config.level
+  #       * self._config.noise_config.scales.joint_vel
+  #   )
+
+  #   # Simplified phase (unused if reward is 0)
+  #   cos = jp.cos(info["phase"])
+  #   sin = jp.sin(info["phase"])
+  #   phase = jp.concatenate([cos, sin])
+
+  #   # Use get_local_linvel from Go1 base
+  #   linvel = self.get_local_linvel(data)
+  #   info["rng"], noise_rng = jax.random.split(info["rng"])
+  #   noisy_linvel = (
+  #       linvel
+  #       + (2 * jax.random.uniform(noise_rng, shape=linvel.shape) - 1)
+  #       * self._config.noise_config.level
+  #       * self._config.noise_config.scales.linvel
+  #   )
+
+  #   state = jp.hstack([
+  #       noisy_linvel,  # 3
+  #       noisy_gyro,  # 3
+  #       noisy_gravity,  # 3
+  #       info["command"],  # 3
+  #       noisy_joint_angles - self._default_pose,  # 12
+  #       noisy_joint_vel,  # 12
+  #       info["last_act"],  # 12
+  #       phase, # 2
+  #   ])
+
+  #   # Use Go1 base functions
+  #   accelerometer = self.get_accelerometer(data)
+  #   global_angvel = self.get_global_angvel(data)
+  #   feet_vel = data.sensordata[self._foot_linvel_sensor_adr].ravel()
+  #   root_height = data.qpos[2]
+
+  #   privileged_state = jp.hstack([
+  #       state,
+  #       gyro,  # 3
+  #       accelerometer,  # 3
+  #       gravity,  # 3
+  #       linvel,  # 3
+  #       global_angvel,  # 3
+  #       joint_angles - self._default_pose, # 12
+  #       joint_vel, # 12
+  #       root_height,  # 1
+  #       data.actuator_force,  # 12
+  #       contact,  # 4
+  #       feet_vel,  # 4*3 = 12
+  #       info["feet_air_time"],  # 4
+  #   ])
+
+  #   return {
+  #       "state": state,
+  #       "privileged_state": privileged_state,
+  #   }
+
   def _get_obs(
       self, data: mjx.Data, info: dict[str, Any], contact: jax.Array
   ) -> mjx_env.Observation:
-    """Returns the observation vector."""
-    # Use Go1 base functions (no "torso"/"pelvis" arg)
-    gyro = self.get_gyro(data)
-    info["rng"], noise_rng = jax.random.split(info["rng"])
-    noisy_gyro = (
-        gyro
-        + (2 * jax.random.uniform(noise_rng, shape=gyro.shape) - 1)
-        * self._config.noise_config.level
-        * self._config.noise_config.scales.gyro
-    )
-
-    # Use get_gravity from Go1 base
-    gravity = self.get_gravity(data)
-    info["rng"], noise_rng = jax.random.split(info["rng"])
-    noisy_gravity = (
-        gravity
-        + (2 * jax.random.uniform(noise_rng, shape=gravity.shape) - 1)
-        * self._config.noise_config.level
-        * self._config.noise_config.scales.gravity
-    )
-
-    joint_angles = data.qpos[7:]
-    info["rng"], noise_rng = jax.random.split(info["rng"])
-    noisy_joint_angles = (
-        joint_angles
-        + (2 * jax.random.uniform(noise_rng, shape=joint_angles.shape) - 1)
-        * self._config.noise_config.level
-        * self._config.noise_config.scales.joint_pos
-    )
-
-    joint_vel = data.qvel[6:]
-    info["rng"], noise_rng = jax.random.split(info["rng"])
-    noisy_joint_vel = (
-        joint_vel
-        + (2 * jax.random.uniform(noise_rng, shape=joint_vel.shape) - 1)
-        * self._config.noise_config.level
-        * self._config.noise_config.scales.joint_vel
-    )
-
-    # Simplified phase (unused if reward is 0)
-    cos = jp.cos(info["phase"])
-    sin = jp.sin(info["phase"])
-    phase = jp.concatenate([cos, sin])
-
-    # Use get_local_linvel from Go1 base
-    linvel = self.get_local_linvel(data)
-    info["rng"], noise_rng = jax.random.split(info["rng"])
-    noisy_linvel = (
-        linvel
-        + (2 * jax.random.uniform(noise_rng, shape=linvel.shape) - 1)
-        * self._config.noise_config.level
-        * self._config.noise_config.scales.linvel
-    )
-
-    state = jp.hstack([
-        noisy_linvel,  # 3
-        noisy_gyro,  # 3
-        noisy_gravity,  # 3
-        info["command"],  # 3
-        noisy_joint_angles - self._default_pose,  # 12
-        noisy_joint_vel,  # 12
-        info["last_act"],  # 12
-        phase, # 2
-    ])
-
-    # Use Go1 base functions
-    accelerometer = self.get_accelerometer(data)
-    global_angvel = self.get_global_angvel(data)
-    feet_vel = data.sensordata[self._foot_linvel_sensor_adr].ravel()
-    root_height = data.qpos[2]
-
-    privileged_state = jp.hstack([
-        state,
-        gyro,  # 3
-        accelerometer,  # 3
-        gravity,  # 3
-        linvel,  # 3
-        global_angvel,  # 3
-        joint_angles - self._default_pose, # 12
-        joint_vel, # 12
-        root_height,  # 1
-        data.actuator_force,  # 12
-        contact,  # 4
-        feet_vel,  # 4*3 = 12
-        info["feet_air_time"],  # 4
-    ])
+    """Returns the observation vector. [DEBUG DUMMY FUNCTION]"""
+    
+    # These are the shapes from your original code
+    state = jp.zeros(47) 
+    privileged_state = jp.zeros(114) 
 
     return {
         "state": state,

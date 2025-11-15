@@ -1,5 +1,6 @@
 <mujoco model="go1 scene">
-  <include file="go1_mjx_feetonly.xml"/>
+  <!-- <include file="go1_mjx_feetonly.xml"/> -->
+  <include file="go1_mjx_fullcollisions.xml"/>
 
   <statistic center="0 0 0.1" extent="0.8" meansize="0.04"/>
 
@@ -29,7 +30,7 @@
   <worldbody>
     <geom name="floor" size="0 0 0.01" material="groundplane" type="plane" contype="1" conaffinity="0"/>
 
-    <body name="stairs" pos="0.2 0 0" childclass="stairs">
+    <body name="stairs" pos="0.1 0 0" childclass="stairs">
       <geom pos="0.2 0 0.075" type="box" size="0.1 0.75 0.025"/>
       <geom pos="0.4 0 0.22" type="box" size="0.1 0.75 0.025"/>
       <geom pos="0.6 0 0.375" type="box" size="0.1 0.75 0.025"/>
